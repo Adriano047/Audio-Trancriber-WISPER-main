@@ -8,6 +8,13 @@ Projeto para transcrição de áudio para texto em português brasileiro usando 
 - PulseAudio/PipeWire (para gravação do microfone)
 - `parec` (vem com `pipewire-pulse` ou `pulseaudio-utils`)
 
+## Requisitos Windows
+- Python 3.13+
+- Dependências Python listadas em `requirements.txt`
+
+> Observação: o arquivo `requirements.txt` foi criado durante a adaptação do projeto para Windows
+> e reflete as dependências utilizadas e testadas nesse ambiente.
+
 ## 🚀 Instalação
 
 ```bash
