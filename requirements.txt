@@ -1,0 +1,11 @@
+faster_whisper==1.2.1
+gTTS==2.5.4
+numpy==2.4.1
+protobuf==6.33.4
+sounddevice==0.5.3
+soundfile==0.13.1
+
+# Windows note:
+# This project runs on Windows.
+# You must install Microsoft Visual C++ Redistributable 2015–2022 (x64)
+# Download from: https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist
