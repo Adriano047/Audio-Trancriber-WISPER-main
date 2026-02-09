@@ -45,7 +45,14 @@ def transcribe_audio_file(
         str(audio_path),
         beam_size=5,
         language=language,
-        task="transcribe"
+        task="transcribe",
+        # initial_prompt serve apenas para dar contexto linguístico ao Whisper.
+        # Ele NÃO cria memória nem regras fixas, apenas influencia a transcrição.
+        # Deve ser sempre texto puro (str). NÃO misturar com tokens (int).
+        initial_prompt=(
+            "Oxygeni, Hub"
+        ),
+        condition_on_previous_text=False
     )
   
     print(f"Idioma detectado: {info.language} (probabilidade: {info.language_probability:.2f})")
@@ -119,7 +126,6 @@ def audio_response(text_ia: str):
 
     ctypes.windll.winmm.mciSendStringW("close voz", None, 0, None)
     os.remove(nome)
-
     
 def main() -> int:
     parser = argparse.ArgumentParser(description="Transcreve arquivo de áudio para pt-BR")
