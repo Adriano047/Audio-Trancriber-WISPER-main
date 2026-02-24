@@ -12,7 +12,7 @@ Uso:
     set -x WHISPER_MODEL_PATH "/caminho/do/modelo"
     python transcribe_file.py audio.mp3
 """
-
+import ollama 
 import argparse
 import json
 import os
@@ -21,111 +21,80 @@ from gtts import gTTS
 from tempfile import NamedTemporaryFile
 import ctypes
 import time
-
-
 from pathlib import Path
-
 from faster_whisper import WhisperModel
-from config import GEMINI_API_KEY
-from google import genai
 
-client = genai.Client(api_key=GEMINI_API_KEY)
+def wrap_text(text: str, words_per_line: int = 10) -> str:
+    words = text.split()
+    lines = [
+        " ".join(words[i:i + words_per_line])
+        for i in range(0, len(words), words_per_line)
+    ]
+    return "\n".join(lines)
 
-def transcribe_audio_file(
-    audio_path: Path,
-    model_path: str = "small",
-    language: str = "pt",
-) -> tuple[str, dict]:
-    """Transcreve arquivo de áudio usando faster-whisper."""
-    print(f"Carregando modelo: {model_path}")
-    model = WhisperModel(model_path, device="cpu", compute_type="int8")
-    
+def load_whisper_model(model_path: str) -> WhisperModel:
+    print(f"Carregando modelo Whisper: {model_path}")
+    return WhisperModel(model_path, device="cpu", compute_type="float32")
+
+def transcribe_audio_file(model: WhisperModel, audio_path: Path) -> tuple[str, dict]:
     print(f"Transcrevendo: {audio_path}")
+
+    start = time.perf_counter()
+
     segments, info = model.transcribe(
         str(audio_path),
         beam_size=5,
-        language=language,
+        language="pt",
         task="transcribe",
-        # initial_prompt serve apenas para dar contexto linguístico ao Whisper.
-        # Ele NÃO cria memória nem regras fixas, apenas influencia a transcrição.
-        # Deve ser sempre texto puro (str). NÃO misturar com tokens (int).
-        initial_prompt=(
-            "Oxygeni, Hub"
-        ),
-        condition_on_previous_text=False
+        condition_on_previous_text=False,
+        initial_prompt="Termos possíveis: Oxygeni Hub, AcademIA, Incode Tech School."
     )
-  
-    print(f"Idioma detectado: {info.language} (probabilidade: {info.language_probability:.2f})")
-   
-    # Coleta todos os segmentos
-    texts = []
-    for segment in segments:
-        print(f"[{segment.start:.2f}s -> {segment.end:.2f}s] {segment.text}")
-       
-        texts.append(segment.text)
-    
-    
+
+    texts = [segment.text.strip() for segment in segments]
     full_text = " ".join(texts)
-    # Quebra de linha a cada 10 palavras
-    words = full_text.split()
-    wrapped_lines = [" ".join(words[i:i + 10]) for i in range(0, len(words), 10)]
-    wrapped_text = "\n".join(wrapped_lines)
+    wrapped = wrap_text(full_text)
+
+    end = time.perf_counter()
+    print(f"Tempo de transcrição: {end - start:.2f}s")
+
     data = {
         "language": info.language,
         "language_probability": info.language_probability,
-        "User": wrapped_text,
+        "User": wrapped,
     }
-    
-    return wrapped_text, data
 
-def response_ia(response_text: str, response_dict: dict) -> tuple[str, dict]:
-    #criando um prompt
-    prompt = f"""
-        Persona:
-        Responda em até 6 frases.
-        Use frases curtas
-        tom neutro e natural
-        Evite jargões tecnicos
-        Evite metáforas abstratas em tarefas práticas
-        Mantenha o foco do tema da pergunta.
+    return wrapped, data
 
-        Pergunta:
-        {response_text}
-    """
-    
-    # Realizando o Input para a IA
-    response = client.models.generate_content(
-        model="gemini-2.5-flash", contents=prompt
+
+def response_ia(response_text: str):
+    #chamando a llm local
+    response = ollama.chat(
+    model='qwen3:0.6b',
+    messages=[
+        {"role": "user", "content": response_text}
+    ]
     )
-    response_dict["IA"] = response.text
-    return response.text, response_dict
+    return response['message']['content']
 
 def audio_response(text_ia: str):
-    if isinstance(text_ia, set):
-        text_ia = " ".join(text_ia)
-
-    text_ia = str(text_ia)
-
     with NamedTemporaryFile(delete=False, suffix=".mp3") as f:
         gTTS(text_ia, lang="pt-br").save(f.name)
-        nome = f.name
+        filename = f.name
 
     ctypes.windll.winmm.mciSendStringW(
-        f'open "{nome}" type mpegvideo alias voz', None, 0, None
+        f'open "{filename}" type mpegvideo alias voz', None, 0, None
     )
     ctypes.windll.winmm.mciSendStringW("play voz", None, 0, None)
 
     status = ctypes.create_unicode_buffer(255)
     while True:
-        ctypes.windll.winmm.mciSendStringW(
-            "status voz mode", status, 255, None
-        )
+        ctypes.windll.winmm.mciSendStringW("status voz mode", status, 255, None)
         if status.value != "playing":
             break
         time.sleep(0.1)
 
     ctypes.windll.winmm.mciSendStringW("close voz", None, 0, None)
-    os.remove(nome)
+    os.remove(filename)
     
 def main() -> int:
     parser = argparse.ArgumentParser(description="Transcreve arquivo de áudio para pt-BR")
@@ -159,53 +128,42 @@ def main() -> int:
         print(f"✗ Arquivo não encontrado: {args.audio_file}")
         return 1
     
-    # Define saídas
-    output_txt = args.output or Path("transcription.txt")
-    output_json = args.json or Path("transcription.json")
-    
     # Modelo (usa variável de ambiente se definida)
     model_path = os.getenv("WHISPER_MODEL_PATH", "small")
     
     try:
-        print("="*60)
-        text, data = transcribe_audio_file(args.audio_file, model_path)
-        
-    except Exception as exc:
-        print(f"\n✗ Erro ao transcrever: {exc}")
-        import traceback
-        traceback.print_exc()
-        return 1
-    # chamando a IA para responder
-    if args.ia_response:
-        try:
-            backup = "User:" + text
-            text, data = response_ia(text, data)
-            print(text)
-            if args.chat_voz:
-                try:
-                    audio_response(text)
-                except Exception as exc:
-                    print(f"Erro ao transformar em audio: {exc}")
-                    import traceback
-                    traceback.print_exc()
-                    return 1
-            text = backup + "\nIa: " + text
+        print("=" * 60)
+
+        whisper_model = load_whisper_model(model_path)
+
+        text, data = transcribe_audio_file(whisper_model, args.audio_file)
+        text = f"User:\n{text}"
+        if args.ia_response:
+            ai_text = response_ia(text)
+            data["IA"] = ai_text
             
-        except Exception as exc:
-            print(f"Erro ao chamar a Ia: {exc}")
-            import traceback
-            traceback.print_exc()
-            return 1
-    print("="*60)
-    # Salva arquivos
-    output_txt.write_text(text, encoding="utf-8")
-    output_json.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            text += f"\n\nIA:\n{ai_text}"
+            if args.chat_voz:
+                audio_response(ai_text)
+
+        print("=" * 60)
+
+        output_path = Path("transcription.txt")
+        output_path.write_text(text, encoding="utf-8")
+        json_path = args.json or Path("transcription.json")
+
+        json_path.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        print(text)
+        print("✓ Arquivos salvos com sucesso")
+
+        return 0
     
-    print(f"\n✓ Transcrição salva em:")
-    print(f"  - {output_txt}")
-    print(f"  - {output_json}")
-    
-    return 0
+    except Exception as exc:
+        print(f"Erro: {exc}")
+        return 1
 
 
 if __name__ == "__main__":

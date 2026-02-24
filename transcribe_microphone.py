@@ -34,7 +34,7 @@ from pathlib import Path
 
 import numpy as np
 from faster_whisper import WhisperModel
-from transcribe_file import transcribe_audio_file, response_ia, audio_response
+from transcribe_file import load_whisper_model, transcribe_audio_file, response_ia, audio_response
 
 def list_audio_sources():
     """Lista fontes de entrada de áudio disponíveis."""
@@ -203,26 +203,24 @@ def main() -> int:
     model_path = os.getenv("WHISPER_MODEL_PATH", "small")
     
     try:
-        text, data = transcribe_audio_file(args.output, model_path)
+        whisper_model = load_whisper_model(model_path)
+
+        text, data = transcribe_audio_file(whisper_model, args.output)
     except Exception as exc:
         print(f"\n✗ Erro ao transcrever: {exc}")
         import traceback
         traceback.print_exc()
         return 1
+    text = f"User:\n{text}"
     # chamando a IA para responder
     if args.ia_response:
         try:
-            backup = "User:" + text
-            text, data = response_ia(text, data)
+            ai_text = response_ia(text)
+            data["IA"] = ai_text
+            text += f"\n\nIA:\n{ai_text}"
+
             if args.chat_voz:
-                try:
-                    audio_response(text)
-                except Exception as exc:
-                    print(f"Erro ao transformar em audio: {exc}")
-                    import traceback
-                    traceback.print_exc()
-                    return 1
-            text = backup + "\nIa: " + text
+                audio_response(ai_text)
         except Exception as exc:
             print(f"Erro ao chamar a Ia: {exc}")
             import traceback
