@@ -8,6 +8,7 @@ build/
 develop-eggs/
 dist/
 downloads/
+transcriptions/
 eggs/
 .eggs/
 lib/
@@ -26,6 +27,7 @@ config.py
 venv/
 ENV/
 env/
+tts_env/
 
 # Audio files
 *.mp3

@@ -1,9 +1,10 @@
-faster_whisper==1.2.1
-gTTS==2.5.4
-numpy==2.4.1
-protobuf==6.33.4
+numpy==1.26.4
 sounddevice==0.5.3
 soundfile==0.13.1
+keyboard==0.13.5
+faster-whisper==1.2.1
+gTTS==2.5.4
+ollama==0.6.1
 
 # Windows note:
 # This project runs on Windows.

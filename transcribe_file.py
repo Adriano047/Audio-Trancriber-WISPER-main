@@ -1,29 +1,30 @@
 """
-Transcreve um arquivo de áudio específico para português brasileiro.
-
 Uso:
     python transcribe_file.py audio.mp3
-    python transcribe_file.py audio.ogg --output saida.txt
     python transcribe_file.py audio.mp3 --ia-response
     python transcribe_file.py audio.mp3 --ia-response --chat-voz 
     
-    
-    # Usar modelo já baixado:
-    set -x WHISPER_MODEL_PATH "/caminho/do/modelo"
-    python transcribe_file.py audio.mp3
 """
+# import logging
+# import TTS
+from gtts import gTTS
 import ollama 
 import argparse
 import json
 import os
 import sys
-from gtts import gTTS
 from tempfile import NamedTemporaryFile
 import ctypes
 import time
 from pathlib import Path
 from faster_whisper import WhisperModel
 
+# Memoria
+chat_history = [
+    {"role": "system", "content": "Você é um assistente de voz útil, objetivo e natural."}
+]
+
+# Formatar texto
 def wrap_text(text: str, words_per_line: int = 10) -> str:
     words = text.split()
     lines = [
@@ -32,10 +33,12 @@ def wrap_text(text: str, words_per_line: int = 10) -> str:
     ]
     return "\n".join(lines)
 
+#  Carregar o modelo de Transcrição
 def load_whisper_model(model_path: str) -> WhisperModel:
     print(f"Carregando modelo Whisper: {model_path}")
     return WhisperModel(model_path, device="cpu", compute_type="float32")
 
+#  Transcrevi o audio em texto
 def transcribe_audio_file(model: WhisperModel, audio_path: Path) -> tuple[str, dict]:
     print(f"Transcrevendo: {audio_path}")
 
@@ -65,21 +68,35 @@ def transcribe_audio_file(model: WhisperModel, audio_path: Path) -> tuple[str, d
 
     return wrapped, data
 
-
+# Chamar o mdelo de IA
 def response_ia(response_text: str):
-    #chamando a llm local
-    response = ollama.chat(
-    model='qwen3:0.6b',
-    messages=[
-        {"role": "user", "content": response_text}
-    ]
-    )
-    return response['message']['content']
+    global chat_history
 
+    chat_history.append({"role": "user", "content": response_text})
+
+    response = ollama.chat(
+        model="qwen3:0.6b",
+        messages=chat_history
+    )
+
+    ai_text = response["message"]["content"]
+
+    chat_history.append({"role": "assistant", "content": ai_text})
+    return ai_text
+
+
+#  retira as mensagens de configuração do terminal
+# logging.getLogger("TTS").setLevel(logging.ERROR)
+
+
+
+# o modelo de voz age
 def audio_response(text_ia: str):
     with NamedTemporaryFile(delete=False, suffix=".mp3") as f:
         gTTS(text_ia, lang="pt-br").save(f.name)
         filename = f.name
+        # tts.tts_to_file(text=text_ia, file_path=f.name,  language="pt", speaker="female-en-5")
+        # filename = f.name
 
     ctypes.windll.winmm.mciSendStringW(
         f'open "{filename}" type mpegvideo alias voz', None, 0, None
@@ -129,8 +146,10 @@ def main() -> int:
         return 1
     
     # Modelo (usa variável de ambiente se definida)
-    model_path = os.getenv("WHISPER_MODEL_PATH", "small")
+    model_path = os.getenv("WHISPER_MODEL_PATH", "small") 
     
+    # modelo de voz
+    # tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2",progress_bar=False, gpu=False) 
     try:
         print("=" * 60)
 
@@ -144,6 +163,7 @@ def main() -> int:
             
             text += f"\n\nIA:\n{ai_text}"
             if args.chat_voz:
+               
                 audio_response(ai_text)
 
         print("=" * 60)
