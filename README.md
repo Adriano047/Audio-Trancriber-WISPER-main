@@ -1,22 +1,44 @@
-# Audio Transcription Project
+# 🎤 Transcrição de Voz com IA (Português Brasileiro)
 
-Projeto para transcrição de áudio para texto em português brasileiro usando **faster-whisper**.
+Este projeto grava áudio do microfone, transcreve automaticamente utilizando **Whisper (faster-whisper)** e pode gerar respostas de **IA local usando Ollama**.  
+Opcionalmente, a resposta da IA também pode ser reproduzida em **áudio (TTS)**.
 
-## Requisitos Linux
+O sistema funciona como um **chat de voz simples local**, permitindo conversar com um modelo de linguagem usando apenas voz.
 
-- Python 3.13+
-- PulseAudio/PipeWire (para gravação do microfone)
-- `parec` (vem com `pipewire-pulse` ou `pulseaudio-utils`)
+---
 
-## Requisitos Windows
-- Python 3.13+
-- Dependências Python listadas em `requirements.txt`
+# 🚀 Funcionalidades
 
-> Observação: o arquivo `requirements.txt` foi criado durante a adaptação do projeto para Windows
-> e reflete as dependências utilizadas e testadas nesse ambiente.
+- 🎤 Grava áudio diretamente do microfone
+- 📝 Transcrição automática em **Português (pt-BR)**
+- 🤖 Resposta automática usando **modelo local via Ollama**
+- 🔊 Conversão da resposta em **voz**
+- 💾 Salvamento da conversa em:
+  - `.txt`
+  - `.json`
+- 🔁 Conversação contínua (loop de gravação)
 
-## Instalação
+---
 
+# 🧠 Tecnologias Utilizadas
+
+- **faster-whisper** – transcrição de áudio
+- **Ollama** – modelo de linguagem local
+- **gTTS** – geração de voz
+- **sounddevice** – captura de áudio
+- **soundfile** – manipulação de áudio
+- **numpy** – processamento de áudio
+
+---
+
+# 📦 Instalação
+
+Clone o projeto:
+
+```bash
+git clone https://github.com/Adriano047/Audio-Trancriber-WISPER-main.git
+cd seu-projeto
+```
 ```bash
 # Criar ambiente virtual
 python -m venv .venv
@@ -26,22 +48,6 @@ source .venv/bin/activate.fish  # ou: source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Dependências principais:
-- `faster-whisper` - Transcrição de áudio
-- `soundfile` - Manipulação de arquivos de áudio
-- `numpy` - Processamento numérico
-
-## Configuração da API
-
-Algumas funcionalidades do projeto utilizam serviços de IA externos e
-exigem uma **chave de API**.
-
-A chave deve ser configurada em um **arquivo de configuração local**,
-que **não deve ser versionado** nem enviado ao repositório.
-
-**Importante**
-- Nunca compartilhe sua chave de API
-- Verifique se o arquivo de configuração está listado no `.gitignore`
 
 ## Uso
 
@@ -72,8 +78,6 @@ python transcribe_file.py audio.ogg --output resultado.txt --json resultado.json
 Grava áudio do microfone por um tempo definido e transcreve:
 
 ```bash
-# Listar fontes de entrada disponíveis
-python transcribe_microphone.py --list-sources
 
 # Gravar 10 segundos e transcrever
 python transcribe_microphone.py --seconds 10
@@ -83,9 +87,6 @@ python transcribe_microphone.py --seconds 10 --ia-response
     
 # Gravar 10s, transcrever e o modelo de Ia responder(texto e audio):
 python transcribe_microphone.py --seconds 10 --ia-response --chat-voz
-
-# Usar fonte específica
-python transcribe_microphone.py --seconds 15 --source "alsa_input.pci-0000_00_1f.3.analog-stereo"
 
 # Apenas gravar (teste de áudio)
 python transcribe_microphone.py --seconds 5 --test-only
@@ -102,13 +103,23 @@ python transcribe_microphone.py --seconds 5 --test-only
 
 Para evitar downloads repetidos do modelo:
 
-```bash
-# Fish shell
-set -x WHISPER_MODEL_PATH "/caminho/para/modelo"
+# ⚙️ Modelo Whisper
 
-# Bash
-export WHISPER_MODEL_PATH="/caminho/para/modelo"
-```
+Por padrão o projeto usa o modelo:
+
+small
+
+O modelo será baixado automaticamente na primeira execução.
+
+Se desejar utilizar um modelo local já baixado, é possível definir o caminho usando a variável de ambiente:
+
+### Windows
+
+set WHISPER_MODEL_PATH=C:\caminho\para\modelo
+
+### Linux / Mac
+
+export WHISPER_MODEL_PATH=/caminho/para/modelo
 
 ### Modelos disponíveis
 
@@ -117,22 +128,6 @@ export WHISPER_MODEL_PATH="/caminho/para/modelo"
 - `small` - **Padrão** - Boa precisão (~2.5GB)
 - `medium` - Muito preciso, mais lento (~5GB)
 - `large` - Máxima precisão, muito lento (~10GB)
-
-## Solução de problemas
-
-### Microfone não captura áudio
-
-1. **Verificar se o microfone está ativo:**
-```bash
-pactl list sources short
-```
-
-2. **Ajustar volume de entrada:**
-```bash
-pavucontrol  # Interface gráfica
-# ou
-pactl set-source-volume @DEFAULT_SOURCE@ 100%
-```
 
 3. **Testar captura sem transcrever:**
 ```bash
@@ -155,13 +150,13 @@ Se o download falhar ou for interrompido:
 ## Estrutura do projeto
 
 ```
-MyProject PY/
-├── config.py                   # Onde fica localizado as chaves de api
+AUDIO-TRANCRIBER-WISPER-MAIN/
+|── transcriptions              # Onde é armazenado a saida dos audios
 ├── transcribe_file.py          # Transcreve arquivos de áudio
 ├── transcribe_microphone.py    # Grava do microfone e transcreve
 ├── requirements.txt             # Dependências Python
 ├── README.md                    # Este arquivo
-├── .venv/                       # Ambiente virtual (não versionado)
+├── env/                      # Ambiente virtual (não versionado)
 └── *.mp3, *.ogg               # Arquivos de áudio de exemplo
 ```
 
