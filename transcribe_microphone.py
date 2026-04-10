@@ -111,6 +111,7 @@ def main() -> int:
     
     
     conversation_data = [] 
+    turn_index = 1
     # Gravação
     print("="*70)
     while True: 
@@ -148,7 +149,9 @@ def main() -> int:
                 text += f"\n\nIA:\n{ai_text}"
 
                 if args.chat_voz:
-                    audio_response(ai_text)
+                    audio_output = folder / f"response_{timestamp}_{turn_index:03d}.mp3"
+                    saved_audio = audio_response(ai_text, audio_output)
+                    data["IA_audio_file"] = str(saved_audio)
                     
             except Exception as exc:
                 print(f"Erro ao chamar a Ia: {exc}")
@@ -173,6 +176,7 @@ def main() -> int:
         print(text)
         print("="*70)
         print(f"\n✓ Salvos: {output_txt}, {output_json}")
+        turn_index += 1
     
 
 if __name__ == "__main__":
