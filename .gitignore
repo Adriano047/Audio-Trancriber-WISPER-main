@@ -27,7 +27,7 @@ config.py
 venv/
 ENV/
 env/
-tts_env/
+tts_venv/
 
 # Audio files
 *.mp3
