@@ -70,20 +70,20 @@ def transcribe_audio_file(model: WhisperModel, audio_path: Path) -> tuple[str, d
 
 # Chamar o mdelo de IA
 def response_ia(response_text: str):
-    global chat_history
 
+    global chat_history
     chat_history.append({"role": "user", "content": response_text})
 
     response = ollama.chat(
-        model="qwen3:0.6b",
+        model="gemma3:1b",
         messages=chat_history
     )
 
     ai_text = response["message"]["content"]
 
     chat_history.append({"role": "assistant", "content": ai_text})
-    return ai_text
 
+    return ai_text
 
 #  retira as mensagens de configuração do terminal
 # logging.getLogger("TTS").setLevel(logging.ERROR)
@@ -157,20 +157,21 @@ def main() -> int:
 
         text, data = transcribe_audio_file(whisper_model, args.audio_file)
         text = f"User:\n{text}"
+        output_path = args.output or Path("transcription.txt")
+        json_path = args.json or Path("transcription.json")
         if args.ia_response:
             ai_text = response_ia(text)
             data["IA"] = ai_text
             
             text += f"\n\nIA:\n{ai_text}"
             if args.chat_voz:
-               
-                audio_response(ai_text)
+                audio_output = args.audio_output or output_path.with_name(f"{output_path.stem}_ia.mp3")
+                saved_audio = audio_response(ai_text, audio_output)
+                data["IA_audio_file"] = str(saved_audio)
 
         print("=" * 60)
 
-        output_path = Path("transcription.txt")
         output_path.write_text(text, encoding="utf-8")
-        json_path = args.json or Path("transcription.json")
 
         json_path.write_text(
             json.dumps(data, ensure_ascii=False, indent=2),
@@ -184,7 +185,6 @@ def main() -> int:
     except Exception as exc:
         print(f"Erro: {exc}")
         return 1
-
 
 if __name__ == "__main__":
     sys.exit(main())
