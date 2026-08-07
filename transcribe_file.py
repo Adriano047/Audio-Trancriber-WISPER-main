@@ -6,7 +6,10 @@ Uso:
     
 """
 # import logging
-# import TTS
+# import TTS   
+import traceback
+import re
+from supertonic import TTS
 from gtts import gTTS
 import argparse
 import ctypes
@@ -16,14 +19,18 @@ import sys
 import time
 from pathlib import Path
 from urllib import error, request
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from faster_whisper import WhisperModel
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL").rstrip("/")
 OLLAMA_MODEL = os.getenv(
     "OLLAMA_MODEL",
-    "llama3.2:latest",
+    "qwen3-institucional-14b",
 )
+TOKEN_KEY = os.getenv("TOKEN_KEY")
 WHISPER_MODEL_REPOS = {
     "tiny.en": "Systran/faster-whisper-tiny.en",
     "tiny": "Systran/faster-whisper-tiny",
@@ -48,7 +55,11 @@ WHISPER_MODEL_REPOS = {
 
 # Memoria
 chat_history = [
-    {"role": "system", "content": "Você é um assistente de voz útil, objetivo e natural."}
+    {"role": "system", 
+    "content": (
+        "Você é um assistente de voz útil, objetivo e natural."
+        "Nunca exponha seu raciocínio interno ou blocos <think>. "
+    )}
 ]
 
 # Formatar texto
@@ -157,54 +168,49 @@ def response_ia(response_text: str):
         {
             "model": OLLAMA_MODEL,
             "messages": chat_history,
-            "stream": True,
+            "stream": False,
+            "temperature": 0.5,
+            "max_tokens": 512,
         }
     ).encode("utf-8")
+    # Utilizando a chave de acesso
     req = request.Request(
-        f"{OLLAMA_BASE_URL}/api/chat",
+        f"{OLLAMA_BASE_URL}/v1/chat/completions",
         data=payload,
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json","Authorization": f"Bearer {TOKEN_KEY}"},
+        
         method="POST",
     )
 
     try:
         with request.urlopen(req, timeout=180) as response:
-            print(f"Chamando Ollama em {OLLAMA_BASE_URL} com streaming...")
-            print("IA: ", end="", flush=True)
-            ai_chunks = []
-            for raw_line in response:
-                line = raw_line.decode("utf-8").strip()
-                if not line:
-                    continue
+            response_data = json.loads(response.read().decode("utf-8"))
 
-                response_data = json.loads(line)
-                message = response_data.get("message", {})
-                chunk = message.get("content", "")
-                if chunk:
-                    ai_chunks.append(chunk)
-                    print(chunk, end="", flush=True)
-
-            print()
     except error.HTTPError as exc:
         details = exc.read().decode("utf-8", errors="replace")
         raise RuntimeError(
-            f"Falha ao chamar Ollama em {OLLAMA_BASE_URL}: HTTP {exc.code} - {details}"
+            f"Falha ao chamar IA em {OLLAMA_BASE_URL}: HTTP {exc.code} - {details}"
         ) from exc
+
     except error.URLError as exc:
         raise RuntimeError(
-            f"Falha ao conectar ao Ollama em {OLLAMA_BASE_URL}: {exc.reason}"
+            f"Falha ao conectar em {OLLAMA_BASE_URL}: {exc.reason}"
         ) from exc
 
-    ai_text = "".join(ai_chunks).strip()
+    ai_text = response_data["choices"][0]["message"]["content"].strip()
+
+    # Remove qualquer bloco <think>...</think> OBS: trecho de codigo temporario até que a IA seja ajustada para não gerar esses blocos
+    ai_text = re.sub(
+        r"<think>.*?</think>",
+        "",
+        ai_text,
+        flags=re.DOTALL | re.IGNORECASE,
+        ).strip()
+    print("IA:", ai_text)
 
     chat_history.append({"role": "assistant", "content": ai_text})
+
     return ai_text
-
-
-#  retira as mensagens de configuração do terminal
-# logging.getLogger("TTS").setLevel(logging.ERROR)
-
-
 
 def play_audio_file(audio_path: Path) -> None:
     ctypes.windll.winmm.mciSendStringW(
@@ -221,18 +227,21 @@ def play_audio_file(audio_path: Path) -> None:
 
     ctypes.windll.winmm.mciSendStringW("close voz", None, 0, None)
 
-
+# Baixa/carrega o modelo
+tts = TTS(auto_download=True)
 # o modelo de voz age
 def audio_response(text_ia: str, output_path: Path, play_audio: bool = True) -> Path:
+    style = tts.get_voice_style(voice_name="F1")
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        gTTS(text_ia, lang="pt").save(str(output_path))
+        wav = tts.synthesize(text_ia,voice_style=style,lang="na")[0]
+        tts.save_audio(wav, str(output_path))
+        # gTTS(text_ia, lang="pt").save(str(output_path))
     except Exception as exc:
-        raise RuntimeError(
-            "Nao foi possivel gerar o audio da resposta. "
-            "O gTTS depende de acesso aos servicos do Google para sintetizar a voz."
-        ) from exc
+     
+        traceback.print_exc()
+        raise
 
     print(f"Audio da IA salvo em: {output_path}")
 
