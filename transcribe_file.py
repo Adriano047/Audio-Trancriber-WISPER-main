@@ -4,12 +4,10 @@ Uso:
     python transcribe_file.py audio.mp3 --ia-response
     python transcribe_file.py audio.mp3 --ia-response --chat-voz 
     
-"""
-# import logging
-# import TTS   
+"""   
+from TTS.api import TTS
 import traceback
 import re
-from supertonic import TTS
 from gtts import gTTS
 import argparse
 import ctypes
@@ -27,8 +25,7 @@ from faster_whisper import WhisperModel
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL").rstrip("/")
 OLLAMA_MODEL = os.getenv(
-    "OLLAMA_MODEL",
-    "qwen3-institucional-14b",
+    "OLLAMA_MODEL"
 )
 TOKEN_KEY = os.getenv("TOKEN_KEY")
 WHISPER_MODEL_REPOS = {
@@ -206,11 +203,11 @@ def response_ia(response_text: str):
         ai_text,
         flags=re.DOTALL | re.IGNORECASE,
         ).strip()
-    print("IA:", ai_text)
+    remove_caracter = ai_text.replace("*", "")
 
-    chat_history.append({"role": "assistant", "content": ai_text})
+    chat_history.append({"role": "assistant", "content": remove_caracter})
 
-    return ai_text
+    return remove_caracter
 
 def play_audio_file(audio_path: Path) -> None:
     ctypes.windll.winmm.mciSendStringW(
@@ -228,16 +225,18 @@ def play_audio_file(audio_path: Path) -> None:
     ctypes.windll.winmm.mciSendStringW("close voz", None, 0, None)
 
 # Baixa/carrega o modelo
-tts = TTS(auto_download=True)
+tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2")
 # o modelo de voz age
 def audio_response(text_ia: str, output_path: Path, play_audio: bool = True) -> Path:
-    style = tts.get_voice_style(voice_name="F1")
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    try:
-        wav = tts.synthesize(text_ia,voice_style=style,lang="na")[0]
-        tts.save_audio(wav, str(output_path))
-        # gTTS(text_ia, lang="pt").save(str(output_path))
+    try: 
+        tts.tts_to_file(
+            text=text_ia,
+            speaker_wav=Path("audio_reference/VozPrincipal.wav"),
+            language="pt",
+            file_path=str(output_path)
+        )
     except Exception as exc:
      
         traceback.print_exc()
@@ -290,9 +289,6 @@ def main() -> int:
     
     # Modelo (usa variável de ambiente se definida)
     model_path = os.getenv("WHISPER_MODEL_PATH", "small") 
-    
-    # modelo de voz
-    # tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2",progress_bar=False, gpu=False) 
     try:
         print("=" * 60)
 
@@ -308,7 +304,7 @@ def main() -> int:
             
             text += f"\n\nIA:\n{ai_text}"
             if args.chat_voz:
-                audio_output = args.audio_output or output_path.with_name(f"{output_path.stem}_ia.mp3")
+                audio_output = args.audio_output or output_path.with_name(f"{output_path.stem}_ia.wav")
                 saved_audio = audio_response(ai_text, audio_output)
                 data["IA_audio_file"] = str(saved_audio)
 
