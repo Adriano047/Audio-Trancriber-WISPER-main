@@ -63,17 +63,6 @@ def record_audio_windows(output_wav: Path) -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Grava do microfone e transcreve (pt-BR)")
     parser.add_argument(
-        "--source",
-        type=str,
-        default=None,
-        help="Nome da fonte de entrada (veja --list-sources)"
-    )
-    parser.add_argument(
-        "--list-sources",
-        action="store_true",
-        help="Lista fontes de entrada disponíveis e sai"
-    )
-    parser.add_argument(
         "--test-only",
         action="store_true",
         help="Apenas grava WAV, sem transcrever"
@@ -97,9 +86,6 @@ def main() -> int:
     args = parser.parse_args()
     model_path = os.getenv("WHISPER_MODEL_PATH", "small")
     whisper_model = load_whisper_model(model_path)
-    
-    # modelo de voz
-    # tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2",progress_bar=False, gpu=False) 
     
     #criando os arquivos de saida
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -149,7 +135,7 @@ def main() -> int:
                 text += f"\n\nIA:\n{ai_text}"
 
                 if args.chat_voz:
-                    audio_output = folder / f"response_{timestamp}_{turn_index:03d}.mp3"
+                    audio_output = folder / f"response_{timestamp}_{turn_index:03d}.wav"
                     saved_audio = audio_response(ai_text, audio_output)
                     data["IA_audio_file"] = str(saved_audio)
                     

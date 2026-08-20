@@ -8,7 +8,6 @@ Uso:
 from TTS.api import TTS
 import traceback
 import re
-from gtts import gTTS
 import argparse
 import ctypes
 import json
@@ -157,7 +156,6 @@ def transcribe_audio_file(model: WhisperModel, audio_path: Path) -> tuple[str, d
 
 # Chamar o mdelo de IA
 def response_ia(response_text: str):
-    global chat_history
 
     chat_history.append({"role": "user", "content": response_text})
 
@@ -203,11 +201,11 @@ def response_ia(response_text: str):
         ai_text,
         flags=re.DOTALL | re.IGNORECASE,
         ).strip()
-    remove_caracter = ai_text.replace("*", "")
+    cleaned_text = ai_text.replace("*", "")
 
-    chat_history.append({"role": "assistant", "content": remove_caracter})
+    chat_history.append({"role": "assistant", "content": cleaned_text})
 
-    return remove_caracter
+    return cleaned_text
 
 def play_audio_file(audio_path: Path) -> None:
     ctypes.windll.winmm.mciSendStringW(
@@ -224,16 +222,17 @@ def play_audio_file(audio_path: Path) -> None:
 
     ctypes.windll.winmm.mciSendStringW("close voz", None, 0, None)
 
-# Baixa/carrega o modelo
-tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2")
+tts = None
 # o modelo de voz age
 def audio_response(text_ia: str, output_path: Path, play_audio: bool = True) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-
+    if tts is None:
+        # Baixa/carrega o modelo
+        tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2")
     try: 
         tts.tts_to_file(
             text=text_ia,
-            speaker_wav=Path("audio_reference/VozPrincipal.wav"),
+            speaker_wav=Path("audio_reference/pense-no-lula.mp3"),
             language="pt",
             file_path=str(output_path)
         )
@@ -272,7 +271,7 @@ def main() -> int:
         "--audio-output",
         type=Path,
         default=None,
-        help="Arquivo MP3 para salvar a resposta em audio"
+        help="Arquivo WAV para salvar a resposta em audio"
     )
     parser.add_argument(
         "--json",
